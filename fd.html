@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Real-time Object Detection</title>
+    <style>
+      /* General body and container styling for centering and a dark theme */
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #1a1a1a;
+        color: #f0f0f0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        padding: 20px;
+        box-sizing: border-box;
+        text-align: center;
+        overflow: hidden; /* Prevent body scrollbars */
+      }
+
+      /* Container for the video and canvas to layer them correctly */
+      .camera-container {
+        position: relative;
+        width: 100%;
+        max-width: 800px;
+        margin: 20px 0;
+        border: 4px solid #4a90e2;
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+      }
+
+      /* Video element styles */
+      video {
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+        display: block; /* Important to remove any default spacing */
+      }
+
+      /* Canvas element styles - it's a layer on top of the video */
+      canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        border-radius: 8px;
+      }
+
+      /* Status message styling */
+      .status {
+        font-size: 1.2rem;
+        font-weight: 600;
+        margin-top: 20px;
+        padding: 10px 20px;
+        background-color: #333;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      }
+
+      /* Responsive design for smaller screens */
+      @media (max-width: 600px) {
+        body {
+          padding: 10px;
+        }
+        .status {
+          font-size: 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Real-time Object Detection</h1>
+    <div class="camera-container">
+      <!-- The video element to display the camera stream -->
+      <video id="webcam" playsinline autoplay muted></video>
+      <!-- The canvas element to draw the bounding boxes and labels -->
+      <canvas id="canvas"></canvas>
+    </div>
+    <!-- Status message for the user -->
+    <div id="status" class="status">Loading...</div>
+
+    <!-- TensorFlow.js and COCO-SSD model scripts from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
+    <script>
+      // Get references to the HTML elements
+      const video = document.getElementById("webcam");
+      const canvas = document.getElementById("canvas");
+      const statusEl = document.getElementById("status");
+      const ctx = canvas.getContext("2d");
+
+      // Global variables for the model and animation loop
+      let model = null;
+      let animationFrameId = null;
+
+      /**
+       * Initializes the camera and loads the object detection model.
+       */
+      async function setupCameraAndModel() {
+        try {
+          // Request access to the user's camera
+          statusEl.textContent = "Requesting camera access...";
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+          video.srcObject = stream;
+
+          // Set up event listener to start detection once the video stream is ready
+          video.onloadeddata = async () => {
+            // Set canvas dimensions to match the video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            // Load the COCO-SSD model
+            statusEl.textContent = "Loading object detection model...";
+            model = await cocoSsd.load();
+            statusEl.textContent = "Model loaded. Ready to detect!";
+
+            // Start the detection loop
+            detectFrame();
+          };
+        } catch (error) {
+          console.error("Error accessing camera or loading model:", error);
+          statusEl.textContent =
+            "Error: " +
+            error.message +
+            ". Please ensure camera access is granted.";
+        }
+      }
+
+      /**
+       * Main detection loop. Continuously detects objects in the video feed.
+       */
+      function detectFrame() {
+        // Check if the model is loaded and the video is playing
+        if (!model || video.readyState < 2) {
+          animationFrameId = requestAnimationFrame(detectFrame);
+          return;
+        }
+
+        // Perform detection on the video frame
+        model.detect(video).then((predictions) => {
+          // Clear the previous drawings on the canvas
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Iterate through each prediction and draw a bounding box
+          predictions.forEach((prediction) => {
+            const [x, y, width, height] = prediction.bbox;
+            const className = prediction.class;
+            const score = Math.round(prediction.score * 100);
+
+            // Only show predictions with a high confidence score
+            if (score > 60) {
+              // Style for the bounding box
+              ctx.strokeStyle = "#4a90e2";
+              ctx.lineWidth = 4;
+              ctx.strokeRect(x, y, width, height);
+
+              // Style for the label background
+              ctx.fillStyle = "#4a90e2";
+              const textWidth = ctx.measureText(
+                `${className} (${score}%)`
+              ).width;
+              ctx.fillRect(x, y > 20 ? y - 25 : y, textWidth + 10, 25);
+
+              // Style for the label text
+              ctx.fillStyle = "#ffffff";
+              ctx.font = "16px sans-serif";
+              ctx.fillText(
+                `${className} (${score}%)`,
+                x + 5,
+                y > 20 ? y - 8 : y + 15
+              );
+            }
+          });
+
+          // Request the next animation frame to continue the loop
+          animationFrameId = requestAnimationFrame(detectFrame);
+        });
+      }
+
+      // Start the application when the window loads
+      window.onload = setupCameraAndModel;
+
+      // Stop the loop if the window is closed or navigated away from
+      window.onbeforeunload = () => {
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+      };
+    </script>
+  </body>
+</html>
