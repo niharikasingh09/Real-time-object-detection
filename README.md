@@ -17,13 +17,13 @@ This is a simple, single-page web application that performs real-time object det
 
 The application can identify and label a wide range of common objects, including people, electronic devices, furniture, and more, as they appear in the camera's view.
 
-🚀 Getting Started
+🚀 Getting Started:
 To get the application up and running on your local machine, follow these simple steps.
 
-Prerequisites
+Prerequisites:
 You only need a modern web browser (like Chrome, Firefox, or Safari) to run this application.
 
-Installation
+Installation:
 No installation is required. The entire application is contained within a single HTML file.
 
 Save the file: Save the entire code as a single .html file. You can name it index.html or object-detection.html.
